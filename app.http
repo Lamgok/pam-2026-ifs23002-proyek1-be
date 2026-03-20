@@ -1,6 +1,6 @@
 ## Global Variabel
 #@BaseUrl = https://pam-2026-p5-ifs23002-be.lamgok.fun:8080/
-@BaseUrl = https://pam-2026-ifs23002-proyek1-be.delcom.org:8080
+@BaseUrl = https://pam-2026-proyek1-ifs23002-be.lamgok.fun:8080/
 ### ---------------------------------------
 ## Auth (Tetap Sama)
 ### ---------------------------------------
