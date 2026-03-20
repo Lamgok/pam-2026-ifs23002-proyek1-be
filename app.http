@@ -1,0 +1,123 @@
+## Global Variabel
+#@BaseUrl = https://pam-2026-p5-ifs23002-be.lamgok.fun:8080/
+@BaseUrl = https://pam-2026-ifs23002-proyek1-be.delcom.org:8080
+### ---------------------------------------
+## Auth (Tetap Sama)
+### ---------------------------------------
+
+### Melakukan pendaftaran
+# @name PostRegister
+POST {{BaseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "name": "Tester",
+  "username": "tester",
+  "password": "tester"
+}
+
+### Masuk ke layanan
+# @name PostLogin
+POST {{BaseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "username": "tester",
+  "password": "tester"
+}
+
+> {%
+    client.global.set("authToken", response.body.data.authToken);
+    client.global.set("refreshToken", response.body.data.refreshToken);
+%}
+
+### ---------------------------------------
+## Users (Tetap Sama)
+### ---------------------------------------
+
+### Mengambil informasi akun
+# @name GetUserMe
+GET {{BaseUrl}}/users/me
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+> {%
+    client.global.set("userId", response.body.data.user.id);
+%}
+
+### ---------------------------------------
+## Ethnographies (Pembaruan Fitur Utama)
+### ---------------------------------------
+
+### Mengambil semua data etnografi suku
+# @name GetEthnographies
+GET {{BaseUrl}}/ethnographies?search=&page=1&perPage=10
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+### Menambahkan data etnografi suku baru
+# @name PostEthnography
+POST {{BaseUrl}}/ethnographies
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "tribeName": "Suku Batak Toba",
+  "region": "Sumatera Utara",
+  "language": "Bahasa Batak Toba",
+  "traditionalHouse": "Jabu Bolon",
+  "traditionalWeapon": "Piso Gaja Dompak",
+  "beliefSystem": "Parmalim / Kristen / Katolik",
+  "description": "Suku Batak Toba merupakan bagian dari suku bangsa Batak di Sumatera Utara yang memiliki adat Dalihan Na Tolu."
+}
+
+> {%
+    client.global.set("ethnographyId", response.body.data.ethnographyId);
+%}
+
+### Mengambil detail etnografi berdasarkan id
+# @name GetEthnographyById
+GET {{BaseUrl}}/ethnographies/{{ethnographyId}}
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+### Mengubah data etnografi
+# @name PutEthnography
+PUT {{BaseUrl}}/ethnographies/{{ethnographyId}}
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "tribeName": "Suku Batak Toba (Updated)",
+  "region": "Sumatera Utara",
+  "language": "Bahasa Batak Toba",
+  "traditionalHouse": "Jabu Bolon",
+  "traditionalWeapon": "Piso Gaja Dompak",
+  "beliefSystem": "Multi-agama",
+  "description": "Deskripsi yang telah diperbarui mengenai kebudayaan suku Batak."
+}
+
+### Mengunggah/Mengubah foto suku atau budaya
+# @name PutEthnographyImage
+PUT {{BaseUrl}}/ethnographies/{{ethnographyId}}/image
+Authorization: Bearer {{authToken}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="batak.png"
+Content-Type: image/png
+
+< ./uploads/examples/batak.png
+--WebAppBoundary--
+
+### Mengambil file foto etnografi
+# @name GetEthnographyImage
+GET {{BaseUrl}}/images/ethnographies/{{ethnographyId}}
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+### Menghapus data etnografi
+# @name DeleteEthnography
+DELETE {{BaseUrl}}/ethnographies/{{ethnographyId}}
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
