@@ -1,6 +1,7 @@
 package org.delcom.services
 
 import com.auth0.jwt.JWT
+import com.auth0.jwt.exceptions.JWTVerificationException
 import com.auth0.jwt.algorithms.Algorithm
 import io.ktor.server.application.*
 import io.ktor.server.request.*
@@ -27,6 +28,8 @@ class AuthService(
     suspend fun postRegister(call: ApplicationCall) {
         // Ambil data request
         val request = call.receive<AuthRequest>()
+        request.username = request.normalizedUsername()
+        request.name = request.name.trim()
 
         // Validasi request
         val validator = ValidatorHelper(request.toMap())
@@ -59,6 +62,7 @@ class AuthService(
     suspend fun postLogin(call: ApplicationCall) {
         // Ambil data request
         val request = call.receive<AuthRequest>()
+        request.username = request.normalizedUsername()
 
         // Validasi request
         val validator = ValidatorHelper(request.toMap())
@@ -68,13 +72,13 @@ class AuthService(
 
         // periksa user dengan username
         val existUser = userRepository.getByUsername(request.username) ?: throw AppException(
-            404,
+            401,
             "Kredensial yang digunakan tidak valid!"
         )
 
         val validPassword = verifyPassword(request.password, existUser.password)
         if (!validPassword) {
-            throw AppException(404, "Kredensial yang digunakan tidak valid!")
+            throw AppException(401, "Kredensial yang digunakan tidak valid!")
         }
 
         val authToken = JWT.create()
@@ -124,12 +128,12 @@ class AuthService(
             authToken = request.authToken
         )
 
-        // Hapus token lama
-        refreshTokenRepository.delete(request.authToken)
-
-        if(existRefreshToken == null) {
+        if (existRefreshToken == null) {
             throw AppException(401, "Token tidak valid!")
         }
+
+        // Hapus token lama setelah pasangan token dipastikan valid
+        refreshTokenRepository.delete(request.authToken)
 
         // periksa user
         val userId = existRefreshToken.userId
@@ -175,9 +179,15 @@ class AuthService(
         validator.required("authToken", "Auth Token tidak boleh kosong")
         validator.validate()
 
-        val decodedJWT = JWT.require(Algorithm.HMAC256(jwtSecret))
-            .build()
-            .verify(request.authToken)
+        val decodedJWT = try {
+            JWT.require(Algorithm.HMAC256(jwtSecret))
+                .withIssuer(JWTConstants.ISSUER)
+                .withAudience(JWTConstants.AUDIENCE)
+                .build()
+                .verify(request.authToken)
+        } catch (_: JWTVerificationException) {
+            throw AppException(401, "Token tidak valid")
+        }
 
         val userId = decodedJWT
             .getClaim("userId")

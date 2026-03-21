@@ -11,8 +11,11 @@ import io.ktor.server.auth.jwt.*
 import io.ktor.server.netty.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.plugins.cors.routing.*
+import io.ktor.server.plugins.statuspages.*
 import io.ktor.server.response.*
 import kotlinx.serialization.json.Json
+import org.delcom.data.AppException
+import org.delcom.data.ErrorResponse
 import org.delcom.helpers.JWTConstants
 import org.delcom.helpers.configureDatabases
 import org.delcom.module.appModule
@@ -32,9 +35,9 @@ fun main(args: Array<String>) {
     EngineMain.main(args)
 }
 
-fun Application.module() {
+fun Application.module(connectDatabase: Boolean = true) {
     // Mengambil secret JWT dari konfigurasi
-    val jwtSecret = environment.config.property("ktor.jwt.secret").getString()
+    val jwtSecret = environment.config.propertyOrNull("ktor.jwt.secret")?.getString() ?: "dev-secret"
 
     // Konfigurasi Autentikasi JWT (Tetap sama untuk User)
     install(Authentication) {
@@ -91,6 +94,31 @@ fun Application.module() {
         )
     }
 
+    install(StatusPages) {
+        exception<AppException> { call, cause ->
+            call.respond(
+                HttpStatusCode.fromValue(cause.code),
+                ErrorResponse(
+                    status = "error",
+                    message = cause.message,
+                    data = null
+                )
+            )
+        }
+
+        exception<Throwable> { call, cause ->
+            cause.printStackTrace()
+            call.respond(
+                HttpStatusCode.InternalServerError,
+                ErrorResponse(
+                    status = "error",
+                    message = "Terjadi kesalahan pada server",
+                    data = null
+                )
+            )
+        }
+    }
+
     // Injeksi Dependensi menggunakan Koin
     install(Koin) {
         // appModule sekarang akan berisi EthnographyRepository & Service
@@ -98,6 +126,8 @@ fun Application.module() {
     }
 
     // Inisialisasi Database dan Routing
-    configureDatabases()
+    if (connectDatabase) {
+        configureDatabases()
+    }
     configureRouting()
 }

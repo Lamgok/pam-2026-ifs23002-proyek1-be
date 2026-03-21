@@ -53,6 +53,8 @@ class UserService(
 
         // Ambil data request
         val request = call.receive<AuthRequest>()
+        request.username = request.normalizedUsername()
+        request.name = request.name.trim()
 
         // Validasi request
         val validator = ValidatorHelper(request.toMap())
