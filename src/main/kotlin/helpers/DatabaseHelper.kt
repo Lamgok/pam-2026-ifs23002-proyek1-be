@@ -2,11 +2,6 @@ package org.delcom.helpers
 
 import io.ktor.server.application.*
 import org.jetbrains.exposed.sql.Database
-import org.jetbrains.exposed.sql.SchemaUtils
-import org.jetbrains.exposed.sql.transactions.transaction
-import org.delcom.tables.EthnographyTable
-import org.delcom.tables.RefreshTokenTable
-import org.delcom.tables.UserTable
 
 fun Application.configureDatabases() {
     val dbHost = environment.config.property("ktor.database.host").getString()
@@ -15,17 +10,9 @@ fun Application.configureDatabases() {
     val dbUser = environment.config.property("ktor.database.user").getString()
     val dbPassword = environment.config.property("ktor.database.password").getString()
 
-    val database = Database.connect(
+    Database.connect(
         url = "jdbc:postgresql://$dbHost:$dbPort/$dbName",
         user = dbUser,
         password = dbPassword
     )
-
-    transaction(database) {
-        SchemaUtils.createMissingTablesAndColumns(
-            UserTable,
-            RefreshTokenTable,
-            EthnographyTable
-        )
-    }
 }

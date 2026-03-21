@@ -5,6 +5,10 @@ import io.ktor.http.content.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
+import io.ktor.util.cio.*
+import io.ktor.utils.io.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.delcom.data.AppException
 import org.delcom.data.AuthRequest
 import org.delcom.data.DataResponse
@@ -12,11 +16,11 @@ import org.delcom.data.UserResponse
 import org.delcom.helpers.ServiceHelper
 import org.delcom.helpers.ValidatorHelper
 import org.delcom.helpers.hashPassword
-import org.delcom.helpers.saveImageUpload
 import org.delcom.helpers.verifyPassword
 import org.delcom.repositories.IRefreshTokenRepository
 import org.delcom.repositories.IUserRepository
 import java.io.File
+import java.util.*
 
 class UserService(
     private val userRepo: IUserRepository,
@@ -49,8 +53,6 @@ class UserService(
 
         // Ambil data request
         val request = call.receive<AuthRequest>()
-        request.username = request.normalizedUsername()
-        request.name = request.name.trim()
 
         // Validasi request
         val validator = ValidatorHelper(request.toMap())
@@ -96,7 +98,21 @@ class UserService(
             when (part) {
                 // Upload file
                 is PartData.FileItem -> {
-                    newPhoto = saveImageUpload(part, "uploads/users")
+                    val ext = part.originalFileName
+                        ?.substringAfterLast('.', "")
+                        ?.let { if (it.isNotEmpty()) ".$it" else "" }
+                        ?: ""
+
+                    val fileName = UUID.randomUUID().toString() + ext
+                    val filePath = "uploads/users/$fileName"
+
+                    withContext(Dispatchers.IO) {
+                        val file = File(filePath)
+                        file.parentFile.mkdirs() // pastikan folder ada
+
+                        part.provider().copyAndClose(file.writeChannel())
+                        newPhoto = filePath
+                    }
                 }
 
                 else -> {}
@@ -184,7 +200,7 @@ class UserService(
     // Mengambil photo
     suspend fun getPhoto(call: ApplicationCall) {
         val userId = call.parameters["id"]
-            ?: throw AppException(400, "ID user tidak valid!")
+            ?: throw AppException(400, "Data todo tidak valid!")
 
         val user = userRepo.getById(userId) ?: throw AppException(400, "User not found!")
 

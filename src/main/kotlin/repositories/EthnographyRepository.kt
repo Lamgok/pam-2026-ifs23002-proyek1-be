@@ -3,7 +3,6 @@ package org.delcom.repositories
 import org.delcom.dao.EthnographyDAO
 import org.delcom.entities.Ethnography
 import org.delcom.helpers.ethnographyDAOToModel
-import org.delcom.helpers.parseUuidOrThrow
 import org.delcom.helpers.suspendTransaction
 import org.delcom.tables.EthnographyTable
 import org.jetbrains.exposed.sql.SortOrder
@@ -12,17 +11,28 @@ import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.lowerCase
 import org.jetbrains.exposed.sql.or
+import java.util.UUID
 
 class EthnographyRepository : IEthnographyRepository {
 
-    override suspend fun getAll(search: String, page: Int, perPage: Int): List<Ethnography> = suspendTransaction {
+    override suspend fun getAll(
+        userId: String,
+        search: String,
+        page: Int,
+        perPage: Int
+    ): List<Ethnography> = suspendTransaction {
         val query = if (search.isBlank()) {
-            EthnographyDAO.all()
+            EthnographyDAO.find {
+                EthnographyTable.userId eq UUID.fromString(userId)
+            }
         } else {
             val keyword = "%${search.lowercase()}%"
             EthnographyDAO.find {
-                (EthnographyTable.tribeName.lowerCase() like keyword) or
-                        (EthnographyTable.region.lowerCase() like keyword)
+                (EthnographyTable.userId eq UUID.fromString(userId)) and (
+                    (EthnographyTable.tribeName.lowerCase() like keyword) or
+                        (EthnographyTable.region.lowerCase() like keyword) or
+                        (EthnographyTable.language.lowerCase() like keyword)
+                    )
             }
         }
 
@@ -33,7 +43,7 @@ class EthnographyRepository : IEthnographyRepository {
     }
 
     override suspend fun getById(id: String): Ethnography? = suspendTransaction {
-        EthnographyDAO.find { EthnographyTable.id eq parseUuidOrThrow(id, "ID etnografi") }
+        EthnographyDAO.find { EthnographyTable.id eq UUID.fromString(id) }
             .limit(1)
             .map(::ethnographyDAOToModel)
             .firstOrNull()
@@ -41,7 +51,7 @@ class EthnographyRepository : IEthnographyRepository {
 
     override suspend fun create(ethnography: Ethnography): String = suspendTransaction {
         val newEntry = EthnographyDAO.new {
-            userId = parseUuidOrThrow(ethnography.userId, "ID user")
+            userId = UUID.fromString(ethnography.userId)
             tribeName = ethnography.tribeName
             region = ethnography.region
             language = ethnography.language
@@ -56,8 +66,11 @@ class EthnographyRepository : IEthnographyRepository {
         newEntry.id.value.toString()
     }
 
-    override suspend fun update(id: String, newEthnography: Ethnography): Boolean = suspendTransaction {
-        val entry = EthnographyDAO.find { EthnographyTable.id eq parseUuidOrThrow(id, "ID etnografi") }
+    override suspend fun update(userId: String, id: String, newEthnography: Ethnography): Boolean = suspendTransaction {
+        val entry = EthnographyDAO.find {
+            (EthnographyTable.id eq UUID.fromString(id)) and
+                (EthnographyTable.userId eq UUID.fromString(userId))
+        }
             .limit(1)
             .firstOrNull()
 
@@ -77,9 +90,10 @@ class EthnographyRepository : IEthnographyRepository {
         }
     }
 
-    override suspend fun delete(id: String): Boolean = suspendTransaction {
+    override suspend fun delete(userId: String, id: String): Boolean = suspendTransaction {
         val rowsDeleted = EthnographyTable.deleteWhere {
-            EthnographyTable.id eq parseUuidOrThrow(id, "ID etnografi")
+            (EthnographyTable.id eq UUID.fromString(id)) and
+                (EthnographyTable.userId eq UUID.fromString(userId))
         }
         rowsDeleted >= 1
     }

@@ -23,10 +23,9 @@ import org.koin.core.module.Module
 import org.koin.ktor.plugin.Koin
 
 fun main(args: Array<String>) {
-    // Memuat variabel lingkungan dari file .env
     val dotenv = dotenv {
         directory = "."
-        ignoreIfMissing = true
+        ignoreIfMissing = false
     }
 
     dotenv.entries().forEach {
@@ -40,10 +39,8 @@ fun Application.module(
     connectDatabase: Boolean = true,
     appModules: List<Module>? = null
 ) {
-    // Mengambil secret JWT dari konfigurasi
     val jwtSecret = environment.config.propertyOrNull("ktor.jwt.secret")?.getString() ?: "dev-secret"
 
-    // Konfigurasi Autentikasi JWT (Tetap sama untuk User)
     install(Authentication) {
         jwt(JWTConstants.NAME) {
             realm = JWTConstants.REALM
@@ -78,16 +75,10 @@ fun Application.module(
         }
     }
 
-    // Mengizinkan akses dari host mana pun (CORS)
     install(CORS) {
         anyHost()
-        allowHeader(HttpHeaders.Authorization)
-        allowHeader(HttpHeaders.ContentType)
-        allowMethod(HttpMethod.Put)
-        allowMethod(HttpMethod.Delete)
     }
 
-    // Konfigurasi JSON Serialization
     install(ContentNegotiation) {
         json(
             Json {
@@ -110,8 +101,7 @@ fun Application.module(
             )
         }
 
-        exception<Throwable> { call, cause ->
-            cause.printStackTrace()
+        exception<Throwable> { call, _ ->
             call.respond(
                 HttpStatusCode.InternalServerError,
                 ErrorResponse(
@@ -123,13 +113,10 @@ fun Application.module(
         }
     }
 
-    // Injeksi Dependensi menggunakan Koin
     install(Koin) {
-        // appModule sekarang akan berisi EthnographyRepository & Service
         modules(appModules ?: listOf(appModule(jwtSecret)))
     }
 
-    // Inisialisasi Database dan Routing
     if (connectDatabase) {
         configureDatabases()
     }

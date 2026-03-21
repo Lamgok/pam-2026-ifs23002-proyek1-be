@@ -294,9 +294,14 @@ private class InMemoryRefreshTokenRepository : IRefreshTokenRepository {
 private class InMemoryEthnographyRepository : IEthnographyRepository {
     private val items = linkedMapOf<String, Ethnography>()
 
-    override suspend fun getAll(search: String, page: Int, perPage: Int): List<Ethnography> {
+    override suspend fun getAll(userId: String, search: String, page: Int, perPage: Int): List<Ethnography> {
         val filtered = items.values.filter {
-            search.isBlank() || it.tribeName.contains(search, ignoreCase = true) || it.region.contains(search, ignoreCase = true)
+            it.userId == userId && (
+                search.isBlank() ||
+                    it.tribeName.contains(search, ignoreCase = true) ||
+                    it.region.contains(search, ignoreCase = true) ||
+                    (it.language?.contains(search, ignoreCase = true) == true)
+                )
         }
         val startIndex = ((page - 1).coerceAtLeast(0)) * perPage.coerceAtLeast(1)
         return filtered.drop(startIndex).take(perPage.coerceAtLeast(1))
@@ -314,11 +319,16 @@ private class InMemoryEthnographyRepository : IEthnographyRepository {
         return ethnography.id
     }
 
-    override suspend fun update(id: String, newEthnography: Ethnography): Boolean {
-        if (!items.containsKey(id)) return false
+    override suspend fun update(userId: String, id: String, newEthnography: Ethnography): Boolean {
+        val current = items[id] ?: return false
+        if (current.userId != userId) return false
         items[id] = newEthnography.copy(id = id, updatedAt = Clock.System.now())
         return true
     }
 
-    override suspend fun delete(id: String): Boolean = items.remove(id) != null
+    override suspend fun delete(userId: String, id: String): Boolean {
+        val current = items[id] ?: return false
+        if (current.userId != userId) return false
+        return items.remove(id) != null
+    }
 }

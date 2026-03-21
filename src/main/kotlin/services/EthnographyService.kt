@@ -5,15 +5,19 @@ import io.ktor.http.content.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
+import io.ktor.util.cio.*
+import io.ktor.utils.io.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.delcom.data.AppException
 import org.delcom.data.DataResponse
 import org.delcom.data.EthnographyRequest
 import org.delcom.helpers.ServiceHelper
 import org.delcom.helpers.ValidatorHelper
-import org.delcom.helpers.saveImageUpload
 import org.delcom.repositories.IEthnographyRepository
 import org.delcom.repositories.IUserRepository
 import java.io.File
+import java.util.UUID
 
 class EthnographyService(
     private val userRepo: IUserRepository,
@@ -27,7 +31,7 @@ class EthnographyService(
         val page = call.request.queryParameters["page"]?.toIntOrNull() ?: 1
         val perPage = call.request.queryParameters["perPage"]?.toIntOrNull() ?: 10
 
-        val ethnographies = ethnographyRepo.getAll(search, page, perPage)
+        val ethnographies = ethnographyRepo.getAll(user.id, search, page, perPage)
 
         val response = DataResponse(
             "success",
@@ -84,7 +88,7 @@ class EthnographyService(
         // Pastikan hanya pemilik/pembuat yang bisa edit (Opsional, sesuai kebutuhan)
         if (oldData.userId != user.id) throw AppException(403, "Anda tidak memiliki akses!")
 
-        val isUpdated = ethnographyRepo.update(id, request.toEntity(user.id))
+        val isUpdated = ethnographyRepo.update(user.id, id, request.toEntity(user.id))
         if (!isUpdated) throw AppException(400, "Gagal memperbarui data!")
 
         call.respond(DataResponse("success", "Berhasil mengubah data etnografi", null))
@@ -102,7 +106,25 @@ class EthnographyService(
 
         multipartData.forEachPart { part ->
             if (part is PartData.FileItem) {
-                imagePath = saveImageUpload(part, "uploads/ethnographies")
+                val ext = part.originalFileName?.substringAfterLast('.', "")?.lowercase() ?: ""
+                if (ext !in setOf("jpg", "jpeg", "png", "webp")) {
+                    throw AppException(400, "Format file gambar tidak didukung!")
+                }
+
+                val contentType = part.contentType?.toString() ?: ""
+                if (contentType !in setOf("image/jpeg", "image/png", "image/webp")) {
+                    throw AppException(400, "Format file gambar tidak didukung!")
+                }
+
+                val fileName = "${UUID.randomUUID()}.$ext"
+                val filePath = "uploads/ethnographies/$fileName"
+
+                withContext(Dispatchers.IO) {
+                    val file = File(filePath)
+                    file.parentFile.mkdirs()
+                    part.provider().copyAndClose(file.writeChannel())
+                    imagePath = filePath
+                }
             }
             part.dispose()
         }
@@ -111,7 +133,7 @@ class EthnographyService(
 
         val newEntity = oldData.copy(imageUrl = imagePath)
 
-        val isUpdated = ethnographyRepo.update(id, newEntity)
+        val isUpdated = ethnographyRepo.update(user.id, id, newEntity)
         if (!isUpdated) throw AppException(400, "Gagal mengunggah foto etnografi!")
 
         // Hapus foto lama jika ada
@@ -128,7 +150,7 @@ class EthnographyService(
         val data = ethnographyRepo.getById(id) ?: throw AppException(404, "Data tidak ditemukan!")
         if (data.userId != user.id) throw AppException(403, "Anda tidak memiliki akses!")
 
-        val isDeleted = ethnographyRepo.delete(id)
+        val isDeleted = ethnographyRepo.delete(user.id, id)
         if (!isDeleted) throw AppException(400, "Gagal menghapus data!")
 
         // Hapus file gambar terkait

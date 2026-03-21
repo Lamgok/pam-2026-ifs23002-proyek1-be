@@ -12,12 +12,10 @@ data class AuthRequest(
     var newPassword: String = "",
     var about: String? = null,
 ){
-    fun normalizedUsername(): String = username.trim().lowercase()
-
     fun toMap(): Map<String, Any?> {
         return mapOf(
             "name" to name,
-            "username" to normalizedUsername(),
+            "username" to username,
             "password" to password,
             "newPassword" to newPassword,
             "about" to about
@@ -27,7 +25,7 @@ data class AuthRequest(
     fun toEntity(): User {
         return User(
             name = name,
-            username = normalizedUsername(),
+            username = username,
             password = password,
             updatedAt = Clock.System.now()
         )
