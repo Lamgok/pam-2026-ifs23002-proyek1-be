@@ -2,17 +2,17 @@ package org.delcom.repositories
 
 import org.delcom.dao.UserDAO
 import org.delcom.entities.User
+import org.delcom.helpers.parseUuidOrThrow
 import org.delcom.helpers.suspendTransaction
 import org.delcom.helpers.userDAOToModel
 import org.delcom.tables.UserTable
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.deleteWhere
-import java.util.*
 
 class UserRepository : IUserRepository {
     override suspend fun getById(userId: String): User? = suspendTransaction {
         UserDAO
-            .find { (UserTable.id eq UUID.fromString(userId)) }
+            .find { (UserTable.id eq parseUuidOrThrow(userId, "ID user")) }
             .limit(1)
             .map(::userDAOToModel)
             .firstOrNull()
@@ -41,7 +41,7 @@ class UserRepository : IUserRepository {
 
     override suspend fun update(id: String, newUser: User): Boolean = suspendTransaction {
         val userDAO = UserDAO
-            .find { UserTable.id eq UUID.fromString(id) }
+            .find { UserTable.id eq parseUuidOrThrow(id, "ID user") }
             .limit(1)
             .firstOrNull()
 
@@ -60,7 +60,7 @@ class UserRepository : IUserRepository {
 
     override suspend fun delete(id: String): Boolean = suspendTransaction {
         val rowsDeleted = UserTable.deleteWhere {
-            UserTable.id eq UUID.fromString(id)
+            UserTable.id eq parseUuidOrThrow(id, "ID user")
         }
         rowsDeleted >= 1
     }

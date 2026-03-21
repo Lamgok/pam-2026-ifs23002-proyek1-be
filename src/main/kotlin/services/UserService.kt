@@ -5,10 +5,6 @@ import io.ktor.http.content.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
-import io.ktor.util.cio.*
-import io.ktor.utils.io.*
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import org.delcom.data.AppException
 import org.delcom.data.AuthRequest
 import org.delcom.data.DataResponse
@@ -16,11 +12,11 @@ import org.delcom.data.UserResponse
 import org.delcom.helpers.ServiceHelper
 import org.delcom.helpers.ValidatorHelper
 import org.delcom.helpers.hashPassword
+import org.delcom.helpers.saveImageUpload
 import org.delcom.helpers.verifyPassword
 import org.delcom.repositories.IRefreshTokenRepository
 import org.delcom.repositories.IUserRepository
 import java.io.File
-import java.util.*
 
 class UserService(
     private val userRepo: IUserRepository,
@@ -100,21 +96,7 @@ class UserService(
             when (part) {
                 // Upload file
                 is PartData.FileItem -> {
-                    val ext = part.originalFileName
-                        ?.substringAfterLast('.', "")
-                        ?.let { if (it.isNotEmpty()) ".$it" else "" }
-                        ?: ""
-
-                    val fileName = UUID.randomUUID().toString() + ext
-                    val filePath = "uploads/users/$fileName"
-
-                    withContext(Dispatchers.IO) {
-                        val file = File(filePath)
-                        file.parentFile.mkdirs() // pastikan folder ada
-
-                        part.provider().copyAndClose(file.writeChannel())
-                        newPhoto = filePath
-                    }
+                    newPhoto = saveImageUpload(part, "uploads/users")
                 }
 
                 else -> {}

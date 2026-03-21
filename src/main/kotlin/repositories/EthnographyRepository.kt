@@ -3,6 +3,7 @@ package org.delcom.repositories
 import org.delcom.dao.EthnographyDAO
 import org.delcom.entities.Ethnography
 import org.delcom.helpers.ethnographyDAOToModel
+import org.delcom.helpers.parseUuidOrThrow
 import org.delcom.helpers.suspendTransaction
 import org.delcom.tables.EthnographyTable
 import org.jetbrains.exposed.sql.SortOrder
@@ -11,7 +12,6 @@ import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.lowerCase
 import org.jetbrains.exposed.sql.or
-import java.util.*
 
 class EthnographyRepository : IEthnographyRepository {
 
@@ -33,7 +33,7 @@ class EthnographyRepository : IEthnographyRepository {
     }
 
     override suspend fun getById(id: String): Ethnography? = suspendTransaction {
-        EthnographyDAO.find { EthnographyTable.id eq UUID.fromString(id) }
+        EthnographyDAO.find { EthnographyTable.id eq parseUuidOrThrow(id, "ID etnografi") }
             .limit(1)
             .map(::ethnographyDAOToModel)
             .firstOrNull()
@@ -41,7 +41,7 @@ class EthnographyRepository : IEthnographyRepository {
 
     override suspend fun create(ethnography: Ethnography): String = suspendTransaction {
         val newEntry = EthnographyDAO.new {
-            userId = UUID.fromString(ethnography.userId)
+            userId = parseUuidOrThrow(ethnography.userId, "ID user")
             tribeName = ethnography.tribeName
             region = ethnography.region
             language = ethnography.language
@@ -57,7 +57,7 @@ class EthnographyRepository : IEthnographyRepository {
     }
 
     override suspend fun update(id: String, newEthnography: Ethnography): Boolean = suspendTransaction {
-        val entry = EthnographyDAO.find { EthnographyTable.id eq UUID.fromString(id) }
+        val entry = EthnographyDAO.find { EthnographyTable.id eq parseUuidOrThrow(id, "ID etnografi") }
             .limit(1)
             .firstOrNull()
 
@@ -79,7 +79,7 @@ class EthnographyRepository : IEthnographyRepository {
 
     override suspend fun delete(id: String): Boolean = suspendTransaction {
         val rowsDeleted = EthnographyTable.deleteWhere {
-            EthnographyTable.id eq UUID.fromString(id)
+            EthnographyTable.id eq parseUuidOrThrow(id, "ID etnografi")
         }
         rowsDeleted >= 1
     }

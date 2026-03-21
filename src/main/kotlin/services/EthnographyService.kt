@@ -5,19 +5,15 @@ import io.ktor.http.content.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
-import io.ktor.util.cio.*
-import io.ktor.utils.io.*
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import org.delcom.data.AppException
 import org.delcom.data.DataResponse
 import org.delcom.data.EthnographyRequest
 import org.delcom.helpers.ServiceHelper
 import org.delcom.helpers.ValidatorHelper
+import org.delcom.helpers.saveImageUpload
 import org.delcom.repositories.IEthnographyRepository
 import org.delcom.repositories.IUserRepository
 import java.io.File
-import java.util.*
 
 class EthnographyService(
     private val userRepo: IUserRepository,
@@ -101,28 +97,22 @@ class EthnographyService(
 
         var imagePath: String? = null
         val multipartData = call.receiveMultipart()
+        val oldData = ethnographyRepo.getById(id) ?: throw AppException(404, "Data tidak ditemukan!")
+        if (oldData.userId != user.id) throw AppException(403, "Anda tidak memiliki akses!")
+
         multipartData.forEachPart { part ->
             if (part is PartData.FileItem) {
-                val ext = part.originalFileName?.substringAfterLast('.', "") ?: ""
-                val fileName = "${UUID.randomUUID()}.$ext"
-                val filePath = "uploads/ethnographies/$fileName"
-
-                withContext(Dispatchers.IO) {
-                    val file = File(filePath)
-                    file.parentFile.mkdirs()
-                    part.provider().copyAndClose(file.writeChannel())
-                    imagePath = filePath
-                }
+                imagePath = saveImageUpload(part, "uploads/ethnographies")
             }
             part.dispose()
         }
 
         if (imagePath == null) throw AppException(400, "Foto tidak tersedia!")
 
-        val oldData = ethnographyRepo.getById(id) ?: throw AppException(404, "Data tidak ditemukan!")
         val newEntity = oldData.copy(imageUrl = imagePath)
 
-        ethnographyRepo.update(id, newEntity)
+        val isUpdated = ethnographyRepo.update(id, newEntity)
+        if (!isUpdated) throw AppException(400, "Gagal mengunggah foto etnografi!")
 
         // Hapus foto lama jika ada
         oldData.imageUrl?.let { File(it).apply { if (exists()) delete() } }
@@ -136,6 +126,7 @@ class EthnographyService(
         val user = ServiceHelper.getAuthUser(call, userRepo)
 
         val data = ethnographyRepo.getById(id) ?: throw AppException(404, "Data tidak ditemukan!")
+        if (data.userId != user.id) throw AppException(403, "Anda tidak memiliki akses!")
 
         val isDeleted = ethnographyRepo.delete(id)
         if (!isDeleted) throw AppException(400, "Gagal menghapus data!")

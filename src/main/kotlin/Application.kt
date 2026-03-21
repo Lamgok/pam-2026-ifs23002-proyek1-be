@@ -19,13 +19,14 @@ import org.delcom.data.ErrorResponse
 import org.delcom.helpers.JWTConstants
 import org.delcom.helpers.configureDatabases
 import org.delcom.module.appModule
+import org.koin.core.module.Module
 import org.koin.ktor.plugin.Koin
 
 fun main(args: Array<String>) {
     // Memuat variabel lingkungan dari file .env
     val dotenv = dotenv {
         directory = "."
-        ignoreIfMissing = false
+        ignoreIfMissing = true
     }
 
     dotenv.entries().forEach {
@@ -35,7 +36,10 @@ fun main(args: Array<String>) {
     EngineMain.main(args)
 }
 
-fun Application.module(connectDatabase: Boolean = true) {
+fun Application.module(
+    connectDatabase: Boolean = true,
+    appModules: List<Module>? = null
+) {
     // Mengambil secret JWT dari konfigurasi
     val jwtSecret = environment.config.propertyOrNull("ktor.jwt.secret")?.getString() ?: "dev-secret"
 
@@ -122,7 +126,7 @@ fun Application.module(connectDatabase: Boolean = true) {
     // Injeksi Dependensi menggunakan Koin
     install(Koin) {
         // appModule sekarang akan berisi EthnographyRepository & Service
-        modules(appModule(jwtSecret))
+        modules(appModules ?: listOf(appModule(jwtSecret)))
     }
 
     // Inisialisasi Database dan Routing
